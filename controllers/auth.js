@@ -1,6 +1,8 @@
+const crypto = require('crypto')
+
 const User = require('../models/User')
 const ErrorResponse = require('../utils/errResponse')
-
+const sendEmail = require('../utils/sendEmail')
 
 
 exports.register = async (req, res, next) => {
@@ -46,7 +48,7 @@ exports.login = async (req, res, next) => {
 }
 
 exports.forgotpassword = async (req, res, next) => {
-    const { email } = res.body
+    const { email } = req.body
     try {
         const user = await User.findOne({email})
 
@@ -65,17 +67,51 @@ exports.forgotpassword = async (req, res, next) => {
             <a href=${resetURL} clicktracking=off>${resetURL}</a>
         `
         try {
-            
+            await sendEmail({
+                to: user.email,
+                subject: "Password Reset Request",
+                text: message
+            })
+
+            res.status(200).json({ success: true, data: "Email sent"})
         } catch (error) {
-            
+            user.getResetPasswordToken = undefined
+            user.restPasswordExpire = undefined
+
+            await user.save()
+            return next(new ErrorResponse("Email could not be sent", 500))
         }
     } catch (error) {
-        
+        return next(error)
     }
 }
 
-exports.resetpassword = (req, res, next) => {
-    res.send('Reset Password Route')
+exports.resetpassword = async (req, res, next) => {
+    const restPasswordToken = crypto.createHash('shaw256').update(req.params.resetToken).digest('hex')
+
+    try {
+        const user = await User.findOne({
+            resetPasswordToken,
+            resetPasswordExpire: {$gt: Date.now()}
+        })
+
+        if(!user){
+            return next(new ErrorResponse("Invalid Reset Token", 400))
+        }
+
+        user.password = req.body.password
+        user.resetPasswordToken = undefined
+        user.resetPasswordExpire = undefined
+
+        await user.save()
+
+        res.status(201).json({
+            success: true,
+            data: "Password Reset Success"
+        })
+    } catch (error) {
+        next(error)
+    }
 }
 
 
