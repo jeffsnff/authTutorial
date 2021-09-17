@@ -1,5 +1,4 @@
 const crypto = require('crypto')
-
 const User = require('../models/User')
 const ErrorResponse = require('../utils/errResponse')
 const sendEmail = require('../utils/sendEmail')
@@ -87,12 +86,12 @@ exports.forgotpassword = async (req, res, next) => {
 }
 
 exports.resetpassword = async (req, res, next) => {
-    const restPasswordToken = crypto.createHash('shaw256').update(req.params.resetToken).digest('hex')
+    const resetPasswordToken = crypto.createHash('sha256').update(req.params.resetToken).digest("hex")
 
     try {
         const user = await User.findOne({
             resetPasswordToken,
-            resetPasswordExpire: {$gt: Date.now()}
+            resetPasswordExpire: { $gt: Date.now() }
         })
 
         if(!user){
